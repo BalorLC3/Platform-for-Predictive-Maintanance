@@ -1,0 +1,13 @@
+# docker-compose.yml
+
+version: '3.8'
+
+services:
+  api:
+    build: .
+    container_name: rul_prediction_api
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount the source code for live-reloading during development (optional)
+      - ./src:/app/src
