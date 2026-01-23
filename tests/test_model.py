@@ -10,7 +10,7 @@ else:
     print(f"File found at {model_path.resolve()}")
     try:
         # Load checkpoint onto CPU to avoid GPU issues
-        checkpoint = torch.load(model_path, map_location=torch.device('cpu'))
+        checkpoint = torch.load(model_path, map_location=torch.device('cpu'), weights_only=True)
         
         print("\n--- Checkpoint Contents ---")
         print("Keys found:", checkpoint.keys())
