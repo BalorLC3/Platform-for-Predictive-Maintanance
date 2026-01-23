@@ -35,25 +35,33 @@ class DataProcessor:
         '''Calculates rolling features'''
         df_out = df.copy()
 
-        for col in self.feature_cols:
-            df_out[f"{col}_rolling_mean"] = df_out[col].rolling(
-                window=self.window_size, min_periods=1
-            ).mean()
+        if self.window_size > 1:
+            for col in self.feature_cols:
+                df_out[f"{col}_rolling_mean"] = df_out[col].rolling(
+                    window=self.window_size, min_periods=1
+                ).mean()
 
         # Security fill
-        df_out.fillna(method='bfill', inplace=True)
-        df_out.fillna(method='ffill', inplace=True)
+        df_out.bfill(inplace=True)
+        df_out.ffill(inplace=True)
         return df_out
     
     def transform(self, df: pd.DataFrame) -> np.ndarray:
+        # Work only with useful features
+        df = df[self.feature_cols].copy()
+        
         if df.shape[0] < self.seq_len:
             raise ValueError(f"Input data must have at least {self.seq_len} rows (sequence length)")
         
         df_featured = self._calculate_rolling_mean(df)
+        
 
         # all feature columns (raw + rolling), the model's input_dim must
         # match the number of columns here
-        all_feature_cols = self.feature_cols + [f"{c}_rolling_mean" for c in self.feature_cols] 
+        if self.window_size > 1:
+            all_feature_cols = self.feature_cols + [f"{c}_rolling_mean" for c in self.feature_cols] 
+        else:
+            all_feature_cols = self.feature_cols
 
         # Take last SEQ_LEN rows to form the sequence
         sequence = df_featured[all_feature_cols].tail(self.seq_len).to_numpy()
