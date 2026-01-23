@@ -1,7 +1,6 @@
 import torch
 from pathlib import Path
 
-# Make sure this path is correct from the root of your project
 model_path = Path("notebooks/lstm_model_inference.pth")
 
 if not model_path.exists():
