@@ -3,5 +3,4 @@ uvicorn[standard]
 torch
 pandas
 numpy
-scikit-learn
 prometheus-fastapi-instrumentator
