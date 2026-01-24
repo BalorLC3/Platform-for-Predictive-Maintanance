@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 import torch
 import torch.nn as nn
+from torch import optim
 from torch.utils.data import DataLoader, Dataset
+from torch.optim.lr_scheduler import CosineAnnealingLR
 from sklearn.model_selection import train_test_split
 from pathlib import Path
 import sys
@@ -40,14 +42,14 @@ class SequenceDataset(Dataset):
         return self.X[idx], self.y[idx]
 
 #  DATA PREPARATION 
-def add_rul(df, rul_clip_value):
+def add_rul(df: pd.DataFrame, rul_clip_value: int):
     """Adds the Remaining Useful Life (RUL) column to a dataframe."""
     max_cycles = df.groupby('engine')['cycle'].transform('max')
     df['RUL'] = max_cycles - df['cycle']
     df['RUL'] = df['RUL'].clip(upper=rul_clip_value)
     return df
 
-def create_sequences_per_engine(df, processor):
+def create_sequences_per_engine(df: pd.DataFrame, processor: type):
     """
     Correctly creates sequences on a per-engine basis.
     This prevents creating sequences that span across two different engines.
@@ -80,7 +82,15 @@ def create_sequences_per_engine(df, processor):
     return X_seq, y_seq
 
 # TRAINING LOOP 
-def train_model(model, train_loader, criterion, optimizer, epochs, device):
+def train_model(
+        model, 
+        train_loader, 
+        criterion, 
+        optimizer, 
+        scheduler, 
+        epochs, 
+        device
+    ):
     """Main training loop."""
     print("Starting model training...")
     history = []
@@ -95,7 +105,9 @@ def train_model(model, train_loader, criterion, optimizer, epochs, device):
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
-        
+
+        scheduler.step()
+
         mean_loss = total_loss / len(train_loader)
         history.append(mean_loss)
         if (epoch + 1) % 10 == 0:
@@ -152,9 +164,19 @@ if __name__ == "__main__":
     ).to(device)
     
     criterion = nn.MSELoss()
-    optimizer = torch.optim.Adam(model.parameters(), lr=CONFIG["learning_rate"])
+    optimizer = optim.Adam(model.parameters(), lr=CONFIG["learning_rate"])
+    # Cossine annealing is very useful for LSTM
+    scheduler = optim.lr_scheduler.CosineAnnealingLR(optimizer, T_max=CONFIG['epochs'])
     
-    trained_model, history = train_model(model, train_loader, criterion, optimizer, CONFIG["epochs"], device)
+    trained_model, history = train_model(
+        model, 
+        train_loader, 
+        criterion, 
+        optimizer, 
+        scheduler, 
+        CONFIG["epochs"], 
+        device
+    )
     
     # Save the Checkpoint for the API
     checkpoint = {
