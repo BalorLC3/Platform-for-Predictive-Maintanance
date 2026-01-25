@@ -19,7 +19,7 @@ app = FastAPI(
 )
 
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
-MODEL_PATH = BASE_DIR / "notebooks/lstm_model_inference.pth"
+MODEL_PATH = BASE_DIR / "checkpoints/lstm_model_inference.pth"
 
 predictor = None
 
