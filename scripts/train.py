@@ -28,7 +28,7 @@ class TrainConfig:
     rul_clip_value: int = 130
     batch_size: int = 128
     learning_rate: float = 1e-3
-    epochs: int = 200
+    epochs: int = 300
     hidden_dim: int = 256
     num_layers: int = 2
     dropout_prob: float = 0.2
