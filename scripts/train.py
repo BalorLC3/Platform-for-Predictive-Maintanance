@@ -226,7 +226,13 @@ if __name__ == "__main__":
 
     # Split data 80/20 for training and validation
     # Normalization is computed on training set to prevent validation leakage
-    X_train_seq, X_val_seq, y_train_seq, y_val_seq = train_test_split(X_seq, y_seq, test_size=0.2, shuffle=True, random_state=17)
+    X_train_seq, X_val_seq, y_train_seq, y_val_seq = train_test_split(
+        X_seq, 
+        y_seq, 
+        test_size=0.2, 
+        shuffle=True, 
+        random_state=17
+    )
     
     mean = X_train_seq.mean(dim=(0, 1), keepdim=True)
     std = X_train_seq.std(dim=(0, 1), keepdim=True) + 1e-8
