@@ -196,7 +196,7 @@ if __name__ == "__main__":
     # Load Raw Training Data
     # Define column names: engine ID, cycle number, 3 operational settings,
     config = TrainConfig(
-            data_path=project_root / "data" / "CMaps",
+            data_path=project_root / "data",
             model_output_path=project_root / "checkpoints" / "lstm_model_inference.pth"
     )
 
