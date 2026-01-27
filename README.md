@@ -8,7 +8,6 @@ Thanks to modern **information technologies and communication networks**, it is 
 * Increasing equipment utilization
 * Extending component lifetimes
 
----
 
 ## Scope of This Work
 
@@ -17,7 +16,6 @@ predicting the **Remaining Useful Life (RUL)** of turbofan engines using a **Lon
 
 The model is trained and evaluated using the **NASA C-MAPSS Turbofan Engine Degradation Dataset**, a widely used benchmark in predictive maintenance research.
 
----
 
 ## Key Features
 
@@ -28,7 +26,6 @@ The model is trained and evaluated using the **NASA C-MAPSS Turbofan Engine Degr
 * **Grafana dashboards** for visualization and alerting
 * Modular codebase following **MLOps-friendly structure**
 
----
 
 ## Runtime View
 
@@ -49,7 +46,6 @@ Prometheus -> Grafana : scrape & visualize
 @enduml
 ```
 
----
 
 ## Usage
 
@@ -73,7 +69,6 @@ uvicorn src.api.main:app --reload
 
 > *A Grafana dashboard is used to visualize prediction volume, error rates, and the latest RUL estimates.*
 
----
 
 ## Dataset
 
