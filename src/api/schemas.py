@@ -7,7 +7,6 @@ np.random.seed(17)
 class TurbofanDataInput(BaseModel):
     data: List[List[float]]
 
-    # FIX: model_config lives directly here. Do NOT put it inside 'class Config'.
     model_config = ConfigDict(
         json_schema_extra={
             "example": {
