@@ -29,7 +29,7 @@ The model is trained and evaluated using the **NASA C-MAPSS Turbofan Engine Degr
 
 ## Runtime View
 
-```
+```mermaid
 sequenceDiagram
     participant Client
     participant API as FastAPI Service
