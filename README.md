@@ -29,21 +29,19 @@ The model is trained and evaluated using the **NASA C-MAPSS Turbofan Engine Degr
 
 ## Runtime View
 
-```plantuml
-@startuml
-participant Client
-participant "FastAPI Service" as API
-participant "LSTM Model" as Model
-participant Prometheus
-participant Grafana
+```
+sequenceDiagram
+    participant Client
+    participant API as FastAPI Service
+    participant Model as LSTM Model
+    participant Prometheus
+    participant Grafana
 
-Client -> API : POST /predict
-API -> Model : RUL inference
-Model --> API : RUL value
-
-API -> Prometheus : expose metrics
-Prometheus -> Grafana : scrape & visualize
-@enduml
+    Client->>API: POST /predict
+    API->>Model: RUL inference
+    Model-->>API: RUL value
+    API->>Prometheus: expose metrics
+    Prometheus->>Grafana: scrape & visualize
 ```
 
 
