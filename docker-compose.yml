@@ -5,10 +5,14 @@ services:
     ports: ["8000:8000"]
     
   prometheus:
+    depends_on:
+      - api
     image: prom/prometheus
     volumes: ["./prometheus.yml:/etc/prometheus/prometheus.yml"]
     ports: ["9090:9090"]
 
   grafana:
+    depends_on:
+      - prometheus
     image: grafana/grafana
     ports: ["3000:3000"]
