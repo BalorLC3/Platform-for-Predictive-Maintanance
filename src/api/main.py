@@ -3,14 +3,13 @@ import logging
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
 from pathlib import Path
+from contextlib import asynccontextmanager
 from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
+
 from src.model.predict import ModelPredictor, FEATURE_COLS
 from src.api.schemas import TurbofanDataInput, PredictionResponse
-from src.monitoring.state import (
-    set_latest_rul,
-    get_latest_rul
-)
+from src.monitoring.state import set_latest_rul, get_latest_rul
 from src.monitoring.metrics import (
     HTTP_REQUESTS_TOTAL,
     HTTP_REQUEST_LATENCY,
@@ -18,84 +17,58 @@ from src.monitoring.metrics import (
     PREDICTIONS_TOTAL
 )
 
-# This ensures we can see what's happening in Docker/Cloud logs
+# ---------------- Logging ----------------
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    format="%(asctime)s - %(levelname)s - %(name)s - %(message)s"
 )
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("rul-api")
+
+class MetricsLogFilter(logging.Filter):
+    def filter(self, record):
+        return "/metrics" not in record.getMessage()
+
+logging.getLogger("uvicorn.access").addFilter(MetricsLogFilter())
+
+# ---------------- Paths ----------------
+BASE_DIR = Path(__file__).resolve().parents[2]
+MODEL_PATH = BASE_DIR / "checkpoints" / "lstm_model_inference.pth"
+
+predictor: ModelPredictor | None = None
+model_loaded = False
+
+# ---------------- App lifecycle ----------------
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    global predictor, model_loaded
+    logger.info("Starting application")
+
+    try:
+        if MODEL_PATH.exists():
+            predictor = ModelPredictor(model_path=MODEL_PATH)
+            model_loaded = True
+            logger.info("Model loaded successfully")
+        else:
+            logger.critical(f"Model not found at {MODEL_PATH}")
+    except Exception as e:
+        logger.critical("Model initialization failed", exc_info=True)
+
+    yield
+    logger.info("Shutting down application")
 
 app = FastAPI(
     title="Turbofan Engine RUL Prediction API",
-    description="API for predicting the Remaining Useful Life of a turbofan engine.",
-    version="1.0.0"
+    description="Predict Remaining Useful Life (RUL) for turbofan engines",
+    version="1.0.0",
+    lifespan=lifespan
 )
 
-BASE_DIR = Path(__file__).resolve().parent.parent.parent
-MODEL_PATH = BASE_DIR / "checkpoints/lstm_model_inference.pth"
-
-predictor = None
-
-model_loaded = False
-
-try:
-    if MODEL_PATH.exists():
-        predictor = ModelPredictor(model_path=MODEL_PATH)
-        model_loaded = True
-        logger.info("Model loaded successfully")
-    else:
-        logger.critical(f"Model file not found at {MODEL_PATH}")
-
-except Exception as e:
-    logger.critical(f"Failed to initialize model: {e}", exc_info=True)
-
-
-
-
-
-@app.get("/", tags=['Health Check'])
-def read_root():
-    # This endpoint works even if the model fails to load
-    return {"status": "API is running. Access to /docs to check."}
-
-@app.post("/predict")
-def predict_rul(input_data: TurbofanDataInput):
-    if predictor is None:
-        PREDICTION_ERRORS_TOTAL.inc()
-        raise HTTPException(status_code=503, detail="Model unavailable")
-
-    try:
-        raw_df = pd.DataFrame(input_data.data, columns=FEATURE_COLS)
-        prediction = predictor.predict(raw_df)  
-
-        # Global declaration
-        set_latest_rul(prediction)
-        PREDICTIONS_TOTAL.inc()
-
-        return PredictionResponse(rul_prediction=prediction)
-
-    except ValueError:
-        PREDICTION_ERRORS_TOTAL.inc()
-        raise
-
-    except Exception:
-        PREDICTION_ERRORS_TOTAL.inc()
-        raise
-
-@app.get("/metrics")
-def metrics():
-    return Response(
-        generate_latest(),
-        media_type=CONTENT_TYPE_LATEST
-    )
-
+# ---------------- Middleware  ----------------
 @app.middleware("http")
 async def prometheus_middleware(request: Request, call_next):
-    start_time = time.time()
-
+    start = time.time()
     response = await call_next(request)
-
-    process_time = time.time() - start_time
+    duration = time.time() - start
 
     HTTP_REQUESTS_TOTAL.labels(
         method=request.method,
@@ -105,9 +78,27 @@ async def prometheus_middleware(request: Request, call_next):
 
     HTTP_REQUEST_LATENCY.labels(
         endpoint=request.url.path
-    ).observe(process_time)
+    ).observe(duration)
 
     return response
+
+@app.middleware("http")
+async def request_logger(request: Request, call_next):
+    start = time.time()
+    response = await call_next(request)
+    duration = time.time() - start
+
+    if request.url.path not in ("/metrics", "/health"):
+        logger.info(
+            f"{request.method} {request.url.path} "
+            f"{response.status_code} {duration:.3f}s"
+        )
+    return response
+
+# ---------------- Routes ----------------
+@app.get("/", tags=["Health"])
+def root():
+    return {"status": "running"}
 
 @app.get("/health")
 def health():
@@ -116,25 +107,43 @@ def health():
         "model_loaded": model_loaded
     }
 
+@app.post("/predict")
+def predict_rul(input_data: TurbofanDataInput):
+    if predictor is None:
+        PREDICTION_ERRORS_TOTAL.inc()
+        raise HTTPException(503, "Model unavailable")
+
+    try:
+        raw_df = pd.DataFrame(input_data.data, columns=FEATURE_COLS)
+        prediction = predictor.predict(raw_df)
+
+        set_latest_rul(prediction)
+        PREDICTIONS_TOTAL.inc()
+
+        return PredictionResponse(rul_prediction=prediction)
+
+    except Exception:
+        PREDICTION_ERRORS_TOTAL.inc()
+        raise
 
 @app.get("/monitor_health")
 def monitor_equipment():
-    """
-    High-level health status derived from recent RUL predictions
-    """
-    rul = get_latest_rul()  # cached / stored / last inference
+    rul = get_latest_rul()
 
     if rul is None:
         raise HTTPException(503, "No predictions available")
 
-    if rul > 100:
-        status = "healthy"
-    elif 30 < rul <= 100:
-        status = "degrading"
-    else:
-        status = "critical"
+    status = (
+        "healthy" if rul > 100
+        else "degrading" if rul > 30
+        else "critical"
+    )
 
     return {
         "health_status": status,
         "rul_estimate": rul
     }
+
+@app.get("/metrics")
+def metrics():
+    return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
