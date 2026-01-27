@@ -9,7 +9,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application source code and model artifact
 COPY src/ /app/src/
-COPY notebooks/lstm_model_inference.pth /app/notebooks/lstm_model_inference.pth
+COPY checkpoints/lstm_model_inference.pth /app/notebooks/lstm_model_inference.pth
 
 # Expose the port the API will run on
 EXPOSE 8000

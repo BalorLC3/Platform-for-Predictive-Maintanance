@@ -1,0 +1,10 @@
+global:
+  scrape_interval: 5s  # How often to check for new metrics
+
+scrape_configs:
+  - job_name: 'fastapi_service'
+    metrics_path: '/metrics'
+    static_configs:
+      # 'api' refers to the service name defined in docker-compose.yml
+      # '8000' is the internal port of the container
+      - targets: ['api:8000']
