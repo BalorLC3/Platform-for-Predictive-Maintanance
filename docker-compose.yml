@@ -3,6 +3,8 @@ services:
     build: .
     container_name: rul_api
     ports: ["8000:8000"]
+    volumes:
+      - ./checkpoints:/app/checkpoints
     
   prometheus:
     depends_on:

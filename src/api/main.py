@@ -36,18 +36,21 @@ MODEL_PATH = BASE_DIR / "checkpoints/lstm_model_inference.pth"
 
 predictor = None
 
+model_loaded = False
+
 try:
-    if not MODEL_PATH.exists():
-        logger.critical(f"Model file not found at {MODEL_PATH}")
-        # We don't raise an exception here to allow the app to start (and return health checks),
-        # but predictions will fail gracefully.
-    else:
-        logger.info(f"Loading model from {MODEL_PATH}...")
+    if MODEL_PATH.exists():
         predictor = ModelPredictor(model_path=MODEL_PATH)
-        logger.info("Model and processor loaded successfully.")
+        model_loaded = True
+        logger.info("Model loaded successfully")
+    else:
+        logger.critical(f"Model file not found at {MODEL_PATH}")
 
 except Exception as e:
     logger.critical(f"Failed to initialize model: {e}", exc_info=True)
+
+
+
 
 
 @app.get("/", tags=['Health Check'])
@@ -105,6 +108,13 @@ async def prometheus_middleware(request: Request, call_next):
     ).observe(process_time)
 
     return response
+
+@app.get("/health")
+def health():
+    return {
+        "status": "ok" if model_loaded else "degraded",
+        "model_loaded": model_loaded
+    }
 
 
 @app.get("/monitor_health")
