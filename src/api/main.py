@@ -1,9 +1,18 @@
 import logging
 import pandas as pd
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from pathlib import Path
+from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
+from fastapi.responses import Response
 from src.model.predict import ModelPredictor, FEATURE_COLS
 from src.api.schemas import TurbofanDataInput, PredictionResponse
+import time
+from src.monitoring.metrics import (
+    HTTP_REQUESTS_TOTAL,
+    HTTP_REQUEST_LATENCY,
+    PREDICTION_ERRORS_TOTAL,
+    PREDICTIONS_TOTAL
+)
 
 # This ensures we can see what's happening in Docker/Cloud logs
 logging.basicConfig(
@@ -42,37 +51,54 @@ def read_root():
     # This endpoint works even if the model fails to load
     return {"status": "API is running. Access to /docs to check."}
 
-@app.post("/predict", response_model=PredictionResponse, tags=["Prediction"])
+@app.post("/predict")
 def predict_rul(input_data: TurbofanDataInput):
-    """
-    Predicts the RUL based on a sequence of sensor readings.
-    """
-    # Check if model loaded correctly on startup
     if predictor is None:
-        logger.error("Prediction attempted but model is not loaded.")
-        raise HTTPException(status_code=503, detail="Model service is currently unavailable.")
+        PREDICTION_ERRORS_TOTAL.inc()
+        raise HTTPException(status_code=503, detail="Model unavailable")
 
-    logger.info("Received prediction request.")
-    
     try:
-        # Create DataFrame 
         raw_df = pd.DataFrame(input_data.data, columns=FEATURE_COLS)
-        
-        # Make prediction
         prediction = predictor.predict(raw_df)
-        
-        logger.info(f"Prediction success: {prediction:.2f}")
+
+        PREDICTIONS_TOTAL.inc()
         return PredictionResponse(rul_prediction=prediction)
 
-    except ValueError as e:
-        # Catches column mismatches or data issues
-        logger.warning(f"Validation error: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-        
-    except Exception as e:
-        # Catches unexpected server errors
-        logger.error(f"Internal prediction error: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An internal error occurred.")
+    except ValueError:
+        PREDICTION_ERRORS_TOTAL.inc()
+        raise
+
+    except Exception:
+        PREDICTION_ERRORS_TOTAL.inc()
+        raise
+
+@app.get("/metrics")
+def metrics():
+    return Response(
+        generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
+
+@app.middleware("http")
+async def prometheus_middleware(request: Request, call_next):
+    start_time = time.time()
+
+    response = await call_next(request)
+
+    process_time = time.time() - start_time
+
+    HTTP_REQUESTS_TOTAL.labels(
+        method=request.method,
+        endpoint=request.url.path,
+        status=response.status_code
+    ).inc()
+
+    HTTP_REQUEST_LATENCY.labels(
+        endpoint=request.url.path
+    ).observe(process_time)
+
+    return response
+
 
 @app.get("/monitor_health")
 def monitor_equipment():
