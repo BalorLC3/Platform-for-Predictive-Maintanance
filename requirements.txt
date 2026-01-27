@@ -3,4 +3,4 @@ uvicorn[standard]
 torch
 pandas
 numpy
-prometheus-fastapi-instrumentator
+prometheus-client
