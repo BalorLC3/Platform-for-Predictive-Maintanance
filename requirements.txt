@@ -1,7 +1,7 @@
 fastapi==0.127.0
 pydantic==2.11.9 # Usually installed with fastapi but just to be sure
 uvicorn[standard]==0.40.0
-torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu # Because GPU acceleration is very heavy, we limit docker to use a cpu version
+torch==2.5.1 --index-url https://download.pytorch.org/whl/cpu # GPU acceleration package is very heavy, we limit docker to use a cpu version,
 pandas==2.3.3
 numpy==2.0.0
 prometheus-client==0.21.1
