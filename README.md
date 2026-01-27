@@ -37,9 +37,12 @@ sequenceDiagram
     participant Prometheus
     participant Grafana
 
-    Client->>API: POST /predict
-    API->>Model: RUL inference
-    Model-->>API: RUL value
+    Note over Client,API: Prediction Request
+    Client->>+API: POST /predict
+    API->>+Model: RUL inference
+    Model-->>-API: RUL value
+    API-->>-Client: Response
+    
     API->>Prometheus: expose metrics
     Prometheus->>Grafana: scrape & visualize
 ```
