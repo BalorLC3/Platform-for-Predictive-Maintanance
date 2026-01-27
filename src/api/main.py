@@ -1,3 +1,4 @@
+import time
 import logging
 import pandas as pd
 from fastapi import FastAPI, HTTPException, Request
@@ -6,7 +7,10 @@ from prometheus_client import generate_latest, CONTENT_TYPE_LATEST
 from fastapi.responses import Response
 from src.model.predict import ModelPredictor, FEATURE_COLS
 from src.api.schemas import TurbofanDataInput, PredictionResponse
-import time
+from src.monitoring.state import (
+    set_latest_rul,
+    get_latest_rul
+)
 from src.monitoring.metrics import (
     HTTP_REQUESTS_TOTAL,
     HTTP_REQUEST_LATENCY,
@@ -59,9 +63,12 @@ def predict_rul(input_data: TurbofanDataInput):
 
     try:
         raw_df = pd.DataFrame(input_data.data, columns=FEATURE_COLS)
-        prediction = predictor.predict(raw_df)
+        prediction = predictor.predict(raw_df)  
 
+        # Global declaration
+        set_latest_rul(prediction)
         PREDICTIONS_TOTAL.inc()
+
         return PredictionResponse(rul_prediction=prediction)
 
     except ValueError:
@@ -102,8 +109,22 @@ async def prometheus_middleware(request: Request, call_next):
 
 @app.get("/monitor_health")
 def monitor_equipment():
-    ...
+    """
+    High-level health status derived from recent RUL predictions
+    """
+    rul = get_latest_rul()  # cached / stored / last inference
 
-@app.get("/within-failure")
-def get_time_within_failure():
-    ...
+    if rul is None:
+        raise HTTPException(503, "No predictions available")
+
+    if rul > 100:
+        status = "healthy"
+    elif 30 < rul <= 100:
+        status = "degrading"
+    else:
+        status = "critical"
+
+    return {
+        "health_status": status,
+        "rul_estimate": rul
+    }
