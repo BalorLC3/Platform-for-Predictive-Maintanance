@@ -46,7 +46,10 @@ sequenceDiagram
     API->>Prometheus: expose metrics
     Prometheus->>Grafana: scrape & visualize
 ```
-
+### Example
+<p align="center">
+  <img src="docs/showcase.png" width="700" />
+</p>
 
 ## Usage
 

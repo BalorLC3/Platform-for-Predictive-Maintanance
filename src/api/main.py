@@ -16,6 +16,8 @@ from src.monitoring.metrics import (
     PREDICTION_ERRORS_TOTAL,
     PREDICTIONS_TOTAL
 )
+import sqlalchemy 
+...
 
 # ---------------- Logging ----------------
 logging.basicConfig(
